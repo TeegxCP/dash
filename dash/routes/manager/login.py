@@ -4,7 +4,8 @@ from functools import wraps
 from urllib.parse import parse_qs
 
 import aiohttp
-import bcrypt
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
 from sanic import Blueprint, response
 from sqlalchemy import func
 from sanic.response import json
@@ -15,6 +16,7 @@ from dash.data.penguin import Penguin
 
 login = Blueprint('login', url_prefix='/login')
 logout = Blueprint('logout', url_prefix='/logout')
+passh = PasswordHasher()
 
 
 @login.get('/')
@@ -77,9 +79,15 @@ async def login_request(request):
 
     password = Crypto.hash(password).upper()
     password = Crypto.get_login_hash(password, rndk=app.config.STATIC_KEY)
-    password_correct = await loop.run_in_executor(None, bcrypt.checkpw,
-                                                  password.encode('utf-8'),
-                                                  data.password.encode('utf-8'))
+
+    password_correct = False
+
+    try:
+        await loop.run_in_executor(None, passh.verify, data.password, password)
+        password_correct = True
+    except VerifyMismatchError:
+        pass
+    
     flood_key = f'{request.ip}.flood'
     if not password_correct:
         if await app.ctx.redis.exists(flood_key):

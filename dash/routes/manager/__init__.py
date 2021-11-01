@@ -1,7 +1,8 @@
 import asyncio
 import os
 import aiohttp
-import bcrypt
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
 
 from email.utils import parseaddr
 from sanic import Blueprint, response
@@ -18,6 +19,7 @@ from dash.routes.manager.verification import verification
 panel = Blueprint('main', url_prefix='/')
 static = Blueprint('static', url_prefix='/static')
 static.static('/', os.path.join(os.path.dirname(os.path.abspath(__file__)), './static'))
+passh = PasswordHasher()
 
 manager = Blueprint.group(
     panel,
@@ -116,9 +118,14 @@ async def password_request(request):
 
     old_password = Crypto.hash(old_password).upper()
     old_password = Crypto.get_login_hash(old_password, rndk=app.config.STATIC_KEY)
-    password_correct = await loop.run_in_executor(None, bcrypt.checkpw,
-                                                  old_password.encode('utf-8'),
-                                                  data.password.encode('utf-8'))
+    
+    password_correct = False
+
+    try:
+        await loop.run_in_executor(None, passh.verify, data.password, old_password)
+        password_correct = True
+    except VerifyMismatchError:
+        pass
 
     if not password_correct:
         page = template.render(
@@ -130,7 +137,7 @@ async def password_request(request):
 
     password = Crypto.hash(password).upper()
     password = Crypto.get_login_hash(password, rndk=app.config.STATIC_KEY)
-    password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
+    password = passh.hash(password)
     await Penguin.update.values(password=password).where(Penguin.id == data.id).gino.status()
     data = await Penguin.query.where(func.lower(Penguin.username) == request.ctx.session.get('username')).gino.first()
     login_history = await Login.query.where(Login.penguin_id == data.id).order_by(Login.date.desc()).limit(5).gino.all()

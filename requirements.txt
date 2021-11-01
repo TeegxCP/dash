@@ -5,7 +5,7 @@ aioredis
 sanic
 sanic_session
 sendgrid
-bcrypt
+argon2-cffi
 gino
 Jinja2
 pillow

@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta
 from email.utils import parseaddr
 
-import bcrypt
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
 from sanic import Blueprint, response
 from sqlalchemy import func
 
@@ -13,6 +14,7 @@ from dash.data.penguin import Login, Penguin
 from dash.routes.manager.login import login_auth
 
 moderation = Blueprint('moderation', url_prefix='/manage')
+passh = PasswordHasher()
 
 
 @moderation.post('/ban')
@@ -275,7 +277,7 @@ async def update_player(request):
             return response.html(page)
         password = Crypto.hash(password).upper()
         password = Crypto.get_login_hash(password, rndk=app.config.STATIC_KEY)
-        password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
+        password = passh.hash(password)
         await Penguin.update.values(password=password).where(Penguin.id == player.id).gino.status()
         page = template.render(
             success_message='Successfully updated password.',

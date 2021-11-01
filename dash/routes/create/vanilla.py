@@ -7,7 +7,7 @@ from email.utils import parseaddr
 from io import BytesIO
 
 import aiohttp
-import bcrypt
+from argon2 import PasswordHasher
 import i18n
 from PIL import Image
 from sanic import Blueprint, response
@@ -22,6 +22,7 @@ from dash.data.mail import PenguinPostcard
 from dash.data.penguin import ActivationKey, Penguin
 
 vanilla_create = Blueprint('vanilla_create', url_prefix='/create/vanilla')
+passh = PasswordHasher()
 
 all_captchas = [
     ('balloon', Image.open('./dash/templates/images/balloon.png')),
@@ -155,7 +156,7 @@ async def _validate_registration(request, lang):
                     return response.text('Your captcha score was low, please try again.')
     password = Crypto.hash(password).upper()
     password = Crypto.get_login_hash(password, rndk=app.config.STATIC_KEY)
-    password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
+    password = passh.hash(password)
 
     username = username.strip()
 

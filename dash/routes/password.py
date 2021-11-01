@@ -1,7 +1,7 @@
 import secrets
 
 import aiohttp
-import bcrypt
+from argon2 import PasswordHasher
 import i18n
 from sanic import Blueprint, response
 from sendgrid import Mail, SendGridAPIClient
@@ -11,6 +11,7 @@ from dash.crypto import Crypto
 from dash.data.penguin import Penguin
 
 password = Blueprint('password', url_prefix='/password')
+passh = PasswordHasher()
 
 
 @password.get('/<lang:(en|fr|pt|es)>')
@@ -173,7 +174,7 @@ async def choose_password(request, lang, reset_token):
         )
     new_password = Crypto.hash(new_password).upper()
     new_password = Crypto.get_login_hash(new_password, rndk=app.config.STATIC_KEY)
-    new_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
+    new_password = passh.hash(new_password)
     await app.ctx.redis.delete(f'{reset_token}.reset_key')
     await Penguin.update.values(password=new_password).where(Penguin.id == data.id).gino.status()
     return response.json(

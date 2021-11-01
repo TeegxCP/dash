@@ -5,7 +5,7 @@ from email.utils import parseaddr
 from urllib.parse import urlencode
 
 import aiohttp
-import bcrypt
+from argon2 import PasswordHasher
 import i18n
 from sanic import Blueprint, response
 from sendgrid import Mail, SendGridAPIClient
@@ -18,6 +18,7 @@ from dash.data.mail import PenguinPostcard
 from dash.data.penguin import ActivationKey, Penguin
 
 legacy_create = Blueprint('legacy_create', url_prefix='/create/legacy')
+passh = PasswordHasher()
 
 
 @legacy_create.post('/')
@@ -156,7 +157,7 @@ async def validate_password_email(request):
 
     password = Crypto.hash(password).upper()
     password = Crypto.get_login_hash(password, rndk=app.config.STATIC_KEY)
-    password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
+    password = passh.hash(password)
 
     username = username.strip()
     if app.config.USERNAME_FORCE_CASE:
